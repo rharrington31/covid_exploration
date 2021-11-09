@@ -1,0 +1,252 @@
+---
+title: "COVID Exploration"
+author: "Ryan Harrington"
+date: "11/8/2021"
+output: 
+  html_document:
+    theme: yeti
+    highlight: textmate
+    toc: TRUE
+    toc_float: TRUE
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(here)
+
+source(here::here("functions.R"))
+
+theme_set(theme_minimal())
+```
+
+# Read in Data
+
+## Read in data
+
+```{r}
+# Link for confirmed cases
+confirmed <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_US.csv"
+
+# Link for confirmed deaths
+deaths <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_US.csv"
+```
+
+```{r}
+confirmed_df <-
+  read_csv(confirmed) %>% 
+  mutate(Type = "Confirmed")
+
+deaths_df <-
+  read_csv(deaths) %>% 
+  mutate(Type = "Deaths")
+```
+
+## Create a population dataframe
+
+```{r}
+population_df <- 
+  deaths_df %>% 
+  select(UID, iso2, iso3, code3, FIPS, Admin2, Province_State, Country_Region, Lat, Long_, Combined_Key, Population)
+```
+
+## Add population to confirmed
+
+```{r}
+confirmed_df <-
+  confirmed_df %>% 
+  left_join(population_df,
+            by = c("UID", "iso2", "iso3", "code3", "FIPS", "Admin2", "Province_State", "Country_Region", "Lat", "Long_", "Combined_Key")
+  ) %>% 
+  select(UID, iso2, iso3, code3, FIPS, Admin2, Province_State, Country_Region, Lat, Long_, Combined_Key, Population, everything())
+```
+
+## Union confirmed cases and deaths together
+
+```{r}
+covid <- 
+  union(confirmed_df, deaths_df) %>% 
+  select(UID, iso2, iso3, code3, FIPS, Admin2, Province_State, Country_Region, Lat, Long_, Combined_Key, Type, Population, everything())
+```
+
+# Check County Data
+
+## New Castle
+
+```{r}
+covid %>% 
+  filter(Admin2 == "New Castle")
+```
+## Kent
+
+```{r}
+covid %>% 
+  filter(Admin2 == "Kent",
+         Province_State == "Delaware")
+```
+
+## Sussex
+
+```{r}
+covid %>% 
+  filter(Admin2 == "Sussex",
+         Province_State == "Delaware")
+```
+
+## Delaware
+
+```{r}
+covid %>% 
+  filter(Province_State == "Delaware")
+```
+
+# Toy functions
+
+## Tell me today's date
+
+### With explicit return
+
+```{r}
+tell_me_todays_date <- function() {
+  
+  # Body of the function
+  todays_date <- format(Sys.Date(), format = "%B %d, %Y")
+  
+  sentence <- paste0("Hello! Today's date is ", todays_date, "!")
+    
+  return(sentence)
+  
+}
+```
+
+### With implicit return
+
+```{r}
+tell_me_todays_date <- function() {
+  
+  # Body of the function
+  todays_date <- format(Sys.Date(), format = "%B %d, %Y")
+  
+  paste0("Hello! Today's date is ", todays_date, "!")
+  
+}
+```
+
+```{r}
+tell_me_todays_date()
+
+tell_me_todays_date()
+```
+
+## Distance from the mean
+
+```{r}
+set.seed(1231)
+
+nums <- sample(1:100, 25, replace = T)
+
+nums
+
+
+nums - mean(nums, na.rm = T)
+```
+
+```{r}
+calc_mean_dist <- function(values) {
+  
+  dist <- values - mean(values, na.rm = T)
+  
+  return(dist)
+  
+}
+```
+
+```{r}
+calc_mean_dist(values = nums)
+```
+
+
+```{r}
+calc_mean_dist(1:10)
+```
+
+```{r}
+calc_mean_dist(seq(from = 1, to = 173, by = 5))
+```
+
+# Function for filtering counties
+
+```{r}
+get_county(covid, "New Castle")
+get_county(covid, "Kent")
+get_county(covid, "Sussex")
+get_county(covid, "All counties")
+get_county(covid, "All counties", "Maryland")
+```
+
+# Continue with Data Cleaning
+
+```{r}
+covid %>% 
+  get_county("New Castle") %>% 
+  tidy_covid()
+```
+
+```{r}
+covid %>% 
+  get_county("Kent", "Maryland") %>% 
+  tidy_covid()
+```
+
+```{r}
+covid %>% 
+  get_county("Monmouth", "New Jersey") %>% 
+  tidy_covid()
+```
+
+```{r}
+covid %>% 
+  get_county("All counties") %>% 
+  tidy_covid()
+```
+
+# Adjusting from cumulative to daily values
+
+```{r}
+covid %>% 
+  get_county("All counties") %>% 
+  tidy_covid()
+```
+
+
+# Graphing our data
+
+```{r}
+covid %>% 
+  get_county("All counties") %>% 
+  tidy_covid() %>% 
+  ggplot(aes(x = Date,
+             y = Confirmed,
+             color = Admin2,
+             group = Admin2)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  theme(legend.position = "top",
+        axis.title = element_text(face = "bold"),
+        axis.text = element_text(face = "italic")) +
+  labs(color = "")
+```
+
+```{r}
+covid %>% 
+  get_county("All counties") %>% 
+  tidy_covid() %>% 
+  graph_covid_over_time(Confirmed_DoD)
+```
+
+
+
